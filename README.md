@@ -2,7 +2,31 @@
 
 [AxManager](https://github.com/fahrez182/AxManager) 的非官方修改版：**修复 Android 16/17 上的激活失败**，并新增**通过 Shizuku 授权以 shell 身份启动**的第三条激活通道。
 
+本项目基于 **[FahrezRB](https://github.com/fahrez182)** 的 AxManager `3.0.0.r509` 修改而来，**原作者是 FahrezRB，不是本仓库**。
+
 > 本仓库不重新分发上游源码，只包含**补丁**、**构建产物**和**复现文档**。上游为 Apache-2.0，版权归原作者所有，详见 [NOTICE](NOTICE)。
+
+---
+
+## 致敬原作者
+
+这个仓库只是站在巨人肩膀上打的一小块补丁。真正的功劳是他们的：
+
+**FahrezRB（[@fahrez182](https://github.com/fahrez182)）—— AxManager 的作者**
+
+从零写出 `manager / server / adb / axsh / reignite` 整套架构：把 Shizuku 级别的权限做成一个可插件化的框架，还要处理 starter 拉起、binder 跨进程交接、插件生命周期、开机自启、ROM 兼容……这些都是我在打这个补丁、一行行读代码时才真正体会到有多难的东西。本项目 **99% 的代码是 TA 写的**，我只动了 7 个文件。
+
+**RikkaW / RikkaApps（[@RikkaApps](https://github.com/RikkaApps)）—— Shizuku 与 Shizuku-API 的作者**
+
+AxManager 的 ADB 配对、privileged server、native starter 都源自 Shizuku。本项目新增的「通过 Shizuku 激活」通道，本质上只是把这份能力接回给没有 root 的用户——没有 Shizuku 多年的积累，这条通道根本不存在。
+
+**以及 AxManager 依赖的所有开源项目**，完整清单见 [NOTICE](NOTICE)。
+
+如果这个修改版对你有用，**请先去上游点一个 Star** —— 那才是真正值得 Star 的地方：
+
+> **https://github.com/fahrez182/AxManager**
+
+本项目与上述作者**无任何隶属关系**，未经其审核或背书；修改版的问题请提到**本仓库**，不要去打扰原作者。
 
 ---
 
