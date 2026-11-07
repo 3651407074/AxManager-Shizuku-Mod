@@ -1,0 +1,321 @@
+﻿warning: in the working copy of 'D:\axm\orig/gradle\libs.versions.toml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'D:\axm/gradle\libs.versions.toml', LF will be replaced by CRLF the next time Git touches it
+diff --git "a/gradle/libs.versions.toml" "b/gradle/libs.versions.toml"
+index 6699286..28a58d9 100644
+--- "a/gradle/libs.versions.toml"
++++ "b/gradle/libs.versions.toml"
+@@ -39,6 +39,7 @@ junit = "4.13.2"
+ junitVersion = "1.3.0"
+ espressoCore = "3.7.0"
+ capsule = "2.1.3"
++shizuku = "13.1.5"
+ 
+ [libraries]
+ androidx-annotation = { module = "androidx.annotation:annotation", version.ref = "annotation" }
+@@ -97,6 +98,8 @@ sheet-compose-dialogs-list = { group = "com.maxkeppeler.sheets-compose-dialogs",
+ sheet-compose-dialogs-input = { group = "com.maxkeppeler.sheets-compose-dialogs", name = "input", version.ref = "sheets-compose-dialogs" }
+ 
+ capsule = { module = "io.github.kyant0:capsule", version.ref = "capsule" }
++shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
++shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
+ 
+ [plugins]
+ android-application = { id = "com.android.application", version.ref = "agp" }
+warning: in the working copy of 'D:\axm\orig/manager\build.gradle.kts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'D:\axm/manager\build.gradle.kts', LF will be replaced by CRLF the next time Git touches it
+diff --git "a/manager/build.gradle.kts" "b/manager/build.gradle.kts"
+index 25cd656..bb00875 100644
+--- "a/manager/build.gradle.kts"
++++ "b/manager/build.gradle.kts"
+@@ -142,4 +142,8 @@ dependencies {
+     implementation(libs.sheet.compose.dialogs.list)
+     implementation(libs.sheet.compose.dialogs.input)
+     implementation(libs.capsule)
++
++    // Shizuku client: lets the manager run the starter as shell (uid 2000) without root.
++    implementation(libs.shizuku.api)
++    implementation(libs.shizuku.provider)
+ }
+warning: in the working copy of 'D:\axm\orig/manager\src\main\AndroidManifest.xml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'D:\axm/manager\src\main\AndroidManifest.xml', LF will be replaced by CRLF the next time Git touches it
+diff --git "a/manager/src/main/AndroidManifest.xml" "b/manager/src/main/AndroidManifest.xml"
+index 80ea23a..a97bdf4 100644
+--- "a/manager/src/main/AndroidManifest.xml"
++++ "b/manager/src/main/AndroidManifest.xml"
+@@ -164,6 +164,17 @@
+             android:multiprocess="false"
+             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+ 
++        <!-- Shizuku client provider: receives the binder from the running Shizuku server, so the
++             manager can run the starter as shell (uid 2000) when there is no root. -->
++        <provider
++            android:name="rikka.shizuku.ShizukuProvider"
++            android:authorities="${applicationId}.shizuku"
++            android:directBootAware="true"
++            android:enabled="true"
++            android:exported="true"
++            android:multiprocess="false"
++            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
++
+         <provider
+             android:name="androidx.core.content.FileProvider"
+             android:authorities="${applicationId}.fileprovider"
+warning: in the working copy of 'D:\axm\orig/manager\src\main\java\frb\axeron\manager\ui\viewmodel\ActivateViewModel.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'D:\axm/manager\src\main\java\frb\axeron\manager\ui\viewmodel\ActivateViewModel.kt', LF will be replaced by CRLF the next time Git touches it
+diff --git "a/manager/src/main/java/frb/axeron/manager/ui/viewmodel/ActivateViewModel.kt" "b/manager/src/main/java/frb/axeron/manager/ui/viewmodel/ActivateViewModel.kt"
+index ac780de..8e96aee 100644
+--- "a/manager/src/main/java/frb/axeron/manager/ui/viewmodel/ActivateViewModel.kt"
++++ "b/manager/src/main/java/frb/axeron/manager/ui/viewmodel/ActivateViewModel.kt"
+@@ -7,6 +7,7 @@ import android.content.Context
+ import android.content.Intent
+ import android.content.pm.PackageManager
+ import android.os.Build
++import android.os.ParcelFileDescriptor
+ import android.provider.Settings
+ import android.util.Log
+ import android.widget.Toast
+@@ -38,6 +39,7 @@ import kotlinx.coroutines.CompletableDeferred
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.Job
+ import kotlinx.coroutines.channels.awaitClose
++import kotlinx.coroutines.coroutineScope
+ import kotlinx.coroutines.delay
+ import kotlinx.coroutines.flow.Flow
+ import kotlinx.coroutines.flow.callbackFlow
+@@ -50,6 +52,9 @@ import kotlinx.coroutines.launch
+ import kotlinx.coroutines.withContext
+ import java.io.File
+ import kotlinx.coroutines.withTimeoutOrNull
++import moe.shizuku.server.IShizukuService
++import rikka.shizuku.Shizuku
++import rikka.shizuku.ShizukuBinderWrapper
+ 
+ class ActivateViewModel : ViewModel() {
+ 
+@@ -61,6 +66,9 @@ class ActivateViewModel : ViewModel() {
+ 
+         /** How long an update may take, from the starter's run to the new server's binder. */
+         const val UPDATE_TIMEOUT = 15000L
++
++        /** Shizuku's request code for the shell permission this manager asks for. */
++        private const val SHIZUKU_PERMISSION_REQUEST = 1001
+     }
+ 
+     // As axeronObserve decides it: an Updating set here is kept through the Disable that a
+@@ -434,6 +442,17 @@ class ActivateViewModel : ViewModel() {
+             if (tryActivate) return@withContext ACTIVATE_PROCESS
+             setTryToActivate(true)
+ 
++            // Shell mode without root: Shizuku runs the starter as uid 2000 itself, which is
++            // exactly what "start as shell" means. Null means Shizuku can't be used here, so the
++            // root path below still gets its chance.
++            if (mode == AxeronSettings.LaunchMethod.ROOT_AS_SHELL) {
++                val viaShizuku = startAsShellViaShizuku()
++                if (viaShizuku != null) {
++                    if (viaShizuku == ACTIVATE_SUCCESS) AxeronSettings.setLastLaunchMode(mode)
++                    return@withContext viaShizuku
++                }
++            }
++
+             ActivationLog.info("Requesting root access…")
+             if (!Shell.getShell().isRoot) {
+                 ActivationLog.error("Root access wasn't granted (no su, or the request was denied)")
+@@ -471,6 +490,88 @@ class ActivateViewModel : ViewModel() {
+         }
+     }
+ 
++    /**
++     * Runs the starter through Shizuku, which executes it as shell (uid 2000) without needing
++     * root — the same thing "start as shell" does through su on a rooted device.
++     *
++     * Returns null when Shizuku isn't usable at all (not installed, not running), so the caller
++     * falls back to the root path; ACTIVATE_FAILED when Shizuku is there but refused or failed.
++     */
++    private suspend fun startAsShellViaShizuku(): Int? {
++        if (!Shizuku.pingBinder()) {
++            ActivationLog.warn("Shizuku isn't running — falling back to root")
++            return null
++        }
++
++        if (Shizuku.isPreV11() ||
++            Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED
++        ) {
++            ActivationLog.info("Requesting Shizuku permission…")
++            if (!requestShizukuPermission()) {
++                ActivationLog.error("Shizuku permission wasn't granted")
++                return ACTIVATE_FAILED
++            }
++        }
++        ActivationLog.success("Shizuku permission granted")
++        ActivationLog.info("Running the starter as shell through Shizuku…")
++
++        return try {
++            // Shizuku's public API has no newProcess(); its service interface does, and the
++            // binder wrapper makes Shizuku's wrapper in the app talk to the real service.
++            val service = IShizukuService.Stub.asInterface(
++                ShizukuBinderWrapper(Shizuku.getBinder()!!)
++            )
++            val remote = service.newProcess(
++                arrayOf("sh", "-c", Starter.internalCommand), null, null
++            )
++            coroutineScope {
++                val out = launch(Dispatchers.IO) {
++                    pump(ParcelFileDescriptor.AutoCloseInputStream(remote.inputStream))
++                }
++                val err = launch(Dispatchers.IO) {
++                    pump(ParcelFileDescriptor.AutoCloseInputStream(remote.errorStream))
++                }
++                val code = withContext(Dispatchers.IO) { remote.waitFor() }
++                out.join()
++                err.join()
++                if (code == 0) {
++                    ActivationLog.success("Starter finished")
++                    ACTIVATE_SUCCESS
++                } else {
++                    ActivationLog.error("Starter exited with code $code")
++                    ACTIVATE_FAILED
++                }
++            }
++        } catch (e: Throwable) {
++            ActivationLog.error("Shizuku activation failed", e)
++            ACTIVATE_FAILED
++        }
++    }
++
++    /** Copies a remote stream into the activation log, line by line. */
++    private fun pump(stream: java.io.InputStream) {
++        runCatching {
++            stream.bufferedReader().use { reader ->
++                reader.forEachLine { line -> ActivationLog.output(line) }
++            }
++        }
++    }
++
++    /**
++     * Asks Shizuku for its permission and waits for the answer: the prompt is drawn by the
++     * Shizuku app, so this can't be a normal runtime-permission request.
++     */
++    private suspend fun requestShizukuPermission(): Boolean = try {
++        Shizuku.requestPermission(SHIZUKU_PERMISSION_REQUEST)
++        withTimeoutOrNull(60_000) {
++            while (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) delay(300)
++            true
++        } ?: false
++    } catch (e: Throwable) {
++        ActivationLog.error("Shizuku permission request failed", e)
++        false
++    }
++
+     @RequiresApi(Build.VERSION_CODES.R)
+     fun updateNotificationState(context: Context) {
+         viewModelScope.launch {
+warning: in the working copy of 'D:\axm\orig/manager\src\main\res\values\strings.xml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'D:\axm/manager\src\main\res\values\strings.xml', LF will be replaced by CRLF the next time Git touches it
+diff --git "a/manager/src/main/res/values/strings.xml" "b/manager/src/main/res/values/strings.xml"
+index bc9f329..d8290ea 100644
+--- "a/manager/src/main/res/values/strings.xml"
++++ "b/manager/src/main/res/values/strings.xml"
+@@ -77,8 +77,8 @@
+     <string name="instruction">Instruction</string>
+     <string name="enable_notification">Enable Notification</string>
+     <string name="start_pairing">Start Pairing</string>
+-    <string name="activate_by_root">Start (for rooted devices)</string>
+-    <string name="activate_by_root_msg"><![CDATA[In addition, AxManager can be started automatically on boot. If not, please check if your system or third-party tools have restricted AxManager.<br>You can refer to %s.]]></string>
++    <string name="activate_by_root">Start (root / Shizuku)</string>
++    <string name="activate_by_root_msg"><![CDATA[With root the starter runs through su; without it, "Start as Shell" runs it through Shizuku instead (start Shizuku first).<br>AxManager can also be started automatically on boot. If not, please check if your system or third-party tools have restricted AxManager.<br>You can refer to %s.]]></string>
+     <string name="adb_tcp_not_ready">ADB TCP not ready on port %d</string>
+     <string name="adb_tcp_stopped">Stop ADB TCP Success</string>
+     <string name="failed_to_stop_adb_tcp">Failed to stop ADB TCP</string>
+warning: in the working copy of 'D:\axm\orig/manager\src\main\res\values-zh-rCN\strings.xml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'D:\axm/manager\src\main\res\values-zh-rCN\strings.xml', LF will be replaced by CRLF the next time Git touches it
+diff --git "a/manager/src/main/res/values-zh-rCN/strings.xml" "b/manager/src/main/res/values-zh-rCN/strings.xml"
+index 4564426..dcc5304 100644
+--- "a/manager/src/main/res/values-zh-rCN/strings.xml"
++++ "b/manager/src/main/res/values-zh-rCN/strings.xml"
+@@ -77,8 +77,8 @@
+     <string name="instruction">操作说明</string>
+     <string name="enable_notification">授予通知权限</string>
+     <string name="start_pairing">开始配对</string>
+-    <string name="activate_by_root">直接激活（仅限拥有 Root 权限的设备）</string>
+-    <string name="activate_by_root_msg"><![CDATA[此外，AxManager 还可以通过 Root 权限实现开机自启。如果未实现，请检查系统或 Root 管理器是否限制了 AxManager。<br>您可以参考%s。]]></string>
++    <string name="activate_by_root">直接激活（Root / Shizuku）</string>
++    <string name="activate_by_root_msg"><![CDATA[有 Root 时用 su 启动；没有 Root 时，「以 Shell 身份启动」会改为通过 Shizuku 授权运行（请先在 Shizuku 里启动服务）。<br>AxManager 还可以通过 Root 权限实现开机自启。如果未实现，请检查系统或 Root 管理器是否限制了 AxManager。<br>您可以参考%s。]]></string>
+     <string name="adb_tcp_not_ready">端口未就绪 %d</string>
+     <string name="adb_tcp_stopped">停止端口成功</string>
+     <string name="failed_to_stop_adb_tcp">无法停止端口</string>
+warning: in the working copy of 'D:\axm\orig/server\src\main\java\frb\axeron\server\AxeronService.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'D:\axm/server\src\main\java\frb\axeron\server\AxeronService.kt', LF will be replaced by CRLF the next time Git touches it
+diff --git "a/server/src/main/java/frb/axeron/server/AxeronService.kt" "b/server/src/main/java/frb/axeron/server/AxeronService.kt"
+index c4d1155..95943b4 100644
+--- "a/server/src/main/java/frb/axeron/server/AxeronService.kt"
++++ "b/server/src/main/java/frb/axeron/server/AxeronService.kt"
+@@ -226,6 +226,12 @@ open class AxeronService :
+         /** The manager this server was started from, and the certificate it was signed with. */
+         class RunningManager(val packageName: String, val uid: Int, val certDigest: String)
+ 
++        /**
++         * The manager package this build runs from, used only when the package manager can't be
++         * asked (see resolveRunningManager).
++         */
++        private const val DEFAULT_MANAGER_PACKAGE = "frb.axeron.manager"
++
+         /**
+          * The manager is whoever started this server, not a package name: the starter runs the
+          * server from that manager's APK, and a later manager that starts a server replaces this
+@@ -272,9 +278,52 @@ open class AxeronService :
+          * can't be read.
+          */
+         fun resolveRunningManager(): RunningManager? {
+-            val apk = System.getProperty("java.class.path")?.substringBefore(':') ?: return null
+-            val owner = PackageManagerApis.getInstalledPackagesNoThrow(0, 0)
+-                .firstOrNull { it?.applicationInfo?.sourceDir == apk } ?: return null
++            val classPath = System.getProperty("java.class.path").orEmpty()
++            val apks = classPath.split(File.pathSeparator).filter { it.endsWith(".apk") }
++            val installed: List<PackageInfo> = try {
++                val list = PackageManagerApis.getInstalledPackagesNoThrow(0, 0)
++                if (list == null) emptyList() else list.filterNotNull()
++            } catch (e: Throwable) {
++                LOGGER.w(e, "getInstalledPackages failed")
++                emptyList()
++            }
++            LOGGER.i(
++                "resolve manager: classPath=%s apks=%s installed=%d",
++                classPath, apks, installed.size
++            )
++
++            // The installed package whose sourceDir is the APK the class path names.
++            var owner: PackageInfo? = installed.firstOrNull { pi ->
++                pi.applicationInfo?.sourceDir?.let { it in apks } == true
++            }
++
++            // A sourceDir that is the same directory under another form (the Installer hands
++            // out slightly different strings on some ROMs).
++            if (owner == null) {
++                val apkDir = apks.firstOrNull()?.let { File(it).parentFile }
++                if (apkDir != null) {
++                    owner = installed.firstOrNull { pi ->
++                        pi.applicationInfo?.sourceDir?.let { File(it).parentFile == apkDir } == true
++                    }
++                    if (owner != null) LOGGER.i("resolve manager: matched by APK dir %s", apkDir)
++                }
++            }
++
++            // The package list can come back empty from the shell on newer ROMs; ask for the
++            // manager by name then, instead of exiting with MANAGER_APP_NOT_FOUND.
++            if (owner == null) {
++                owner = try {
++                    PackageManagerApis.getPackageInfoNoThrow(DEFAULT_MANAGER_PACKAGE, 0, 0)
++                } catch (e: Throwable) {
++                    LOGGER.w(e, "getPackageInfo(%s) failed", DEFAULT_MANAGER_PACKAGE)
++                    null
++                }
++                if (owner != null) {
++                    LOGGER.i("resolve manager: fell back to %s", DEFAULT_MANAGER_PACKAGE)
++                }
++            }
++
++            if (owner == null) return null
+             val digest = certDigest(owner.packageName) ?: return null
+             return RunningManager(owner.packageName, owner.applicationInfo!!.uid, digest)
+         }
+
