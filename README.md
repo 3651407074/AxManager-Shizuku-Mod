@@ -153,6 +153,19 @@ adb install -r AxManager-mod-shizuku-debug.apk
 
 有 root 时逻辑与官方一致（`su` 或 `su 2000 -c`）。
 
+## 配套性能模块（4 个）
+
+针对"打游戏稳帧"写的 AxManager 插件模块，源码在 [`modules/`](modules/)，安装包见 [Modules Release](../../releases)：
+
+| 模块 | 名字 | 作用 |
+|---|---|---|
+| `gameturbo_stable` | **GameTurbo 稳帧引擎** | 识别游戏 → 切性能档 / 锁高刷 / 满频，退出还原 |
+| `coolcore_thermal` | **CoolCore 冰封温控** | 温度监控；root 下可后移温控触发点 |
+| `framelock_rate` | **FrameLock 帧率锁** | 一键锁 60/90/120/144Hz，带写入回读校验 |
+| `memboost_clean` | **MemBoost 内存加速** | 进游戏前清后台，实测释放 331MB |
+
+能力边界（无 root 时哪些真能用、哪些是 ROM 限制）写在 [modules/README.md](modules/README.md)。
+
 ## 构建
 
 见 [docs/BUILD.md](docs/BUILD.md)。

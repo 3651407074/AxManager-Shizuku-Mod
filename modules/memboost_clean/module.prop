@@ -1,0 +1,7 @@
+id=memboost_clean
+name=MemBoost 内存加速 (RAM Boost)
+version=v1.0.0
+versionCode=10000
+author=AxManager Mod
+description=进游戏前清后台、把交换倾向压低，给前台腾出内存；Root 下还能调 vm 参数。开黑前点一下"运行"就行。Free RAM before a match: drop caches and kill background apps, plus (root) vm tuning.
+axeronPlugin=30000

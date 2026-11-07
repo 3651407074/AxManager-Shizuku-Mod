@@ -1,0 +1,7 @@
+id=coolcore_thermal
+name=CoolCore 冰封温控 (Thermal Control)
+version=v1.0.0
+versionCode=10000
+author=AxManager Mod
+description=实时盯温度、记录降频，Root 模式可把温控触发点整体后移，让手机"热但不降频"。默认只监测不动手，安全。Thermal monitor + optional (root) trip-point offset so the phone keeps its clocks when hot.
+axeronPlugin=30000

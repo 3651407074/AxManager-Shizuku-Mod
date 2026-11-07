@@ -1,0 +1,7 @@
+id=gameturbo_stable
+name=GameTurbo 稳帧引擎 (Frame Stabilizer)
+version=v1.0.0
+versionCode=10000
+author=AxManager Mod
+description=进入游戏自动切性能模式、锁高刷、满频调度，退出游戏自动还原。Shell 模式用系统游戏接口，Root 模式额外接管 CPU/GPU 调频。Auto performance profile + refresh lock + full-clock scheduling while gaming.
+axeronPlugin=30000

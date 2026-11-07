@@ -1,0 +1,7 @@
+id=framelock_rate
+name=FrameLock 帧率锁 (Refresh Lock)
+version=v1.0.0
+versionCode=10000
+author=AxManager Mod
+description=一键把刷新率锁在 60/90/120/144 或恢复自动，打游戏时少一跳一卡。点"运行"轮换档位，开机自动恢复上次选择。Cycle 60/90/120/144/auto and keep your choice across reboots.
+axeronPlugin=30000
